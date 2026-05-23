@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>移动钢琴 - Mobile Piano</title>
+    <style>
+        :root {
+            --white-key-width: calc(100% / 15);
+            --black-key-width: calc(var(--white-key-width) * 0.58);
+            --white-key-height: 210px;
+            --black-key-height: 130px;
+            --piano-bg: #1a1a1a;
+            --white-key-color: #f8f4ed;
+            --white-key-pressed: #d0e4f7;
+            --white-key-border: #c5bfb5;
+            --black-key-color: #2a2a2a;
+            --black-key-pressed: #5a7da8;
+            --black-key-border: #111;
+            --display-bg: #1e1e2e;
+            --display-text: #e0e0e0;
+            --accent: #c9a96e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0d0d0f;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            touch-action: manipulation;
+            -webkit-overflow-scrolling: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: env(safe-area-inset-bottom, 8px);
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        /* 顶部信息栏 */
+        .info-bar {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px 16px 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .note-display {
+            flex: 1;
+            background: var(--display-bg);
+            border-radius: 14px;
+            padding: 12px 16px;
+            text-align: center;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            border: 1px solid #2a2a35;
+        }
+
+        .note-display .note-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            transition: all 0.08s ease;
+        }
+        .note-display .note-name.idle {
+            color: #555;
+            font-size: 16px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+        .note-display .note-freq {
+            font-size: 11px;
+            color: #777;
+            margin-left: 6px;
+            font-weight: 400;
+        }
+
+        .volume-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--display-bg);
+            border-radius: 14px;
+            padding: 8px 12px;
+            border: 1px solid #2a2a35;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
+        }
+        .volume-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+        .volume-slider {
+            -webkit-appearance: none;
+            width: 70px;
+            height: 5px;
+            border-radius: 3px;
+            background: #3a3a45;
+            outline: none;
+            cursor: pointer;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #c9a96e;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 钢琴主体 */
+        .piano-wrapper {
+            width: 100%;
+            max-width: 500px;
+            padding: 0 8px 4px;
+            flex-shrink: 0;
+        }
+        .piano-container {
+            position: relative;
+            width: 100%;
+            background: #1a1a1e;
+            border-radius: 16px 16px 8px 8px;
+            padding: 10px 6px 14px 6px;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.6),
+                0 2px 0 #0a0a0c inset,
+                0 -1px 0 rgba(255, 255, 255, 0.03) inset;
+            overflow: hidden;
+            border: 1px solid #222;
+        }
+
+        .keys-area {
+            position: relative;
+            width: 100%;
+            height: var(--white-key-height);
+            /* 白键容器 */
+        }
+
+        .white-keys-row {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .white-key {
+            flex: 1;
+            height: 100%;
+            background: linear-gradient(180deg,
+                    #fefefe 0%,
+                    #f8f4ed 3%,
+                    #f3efe7 15%,
+                    #ece6db 50%,
+                    #e8e1d5 85%,
+                    #ddd6c8 100%);
+            border: 1px solid #c8c0b4;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            transition: background 0.06s ease, box-shadow 0.06s ease, transform 0.04s ease;
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.15),
+                0 -1px 0 rgba(255, 255, 255, 0.5) inset,
+                2px 0 1px -1px rgba(0, 0, 0, 0.06) inset,
+                -2px 0 1px -1px rgba(0, 0, 0, 0.06) inset;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 10px;
+            min-width: 20px;
+        }
+        .white-key:active {
+            cursor: pointer;
+        }
+        .white-key.pressed {
+            background: linear-gradient(180deg,
+                    #d8e8f8 0%,
+                    #c8ddf2 5%,
+                    #bdd4ec 30%,
+                    #b8cfe6 70%,
+                    #aec4db 100%);
+            box-shadow:
+                0 0px 1px rgba(0, 0, 0, 0.2),
+                1px 0 2px rgba(0, 0, 0, 0.1) inset,
+                -1px 0 2px rgba(0, 0, 0, 0.1) inset,
+                0 2px 4px rgba(0, 0, 0, 0.1) inset;
+            border-color: #a0b8cc;
+            transform: translateY(1px);
+            transition: all 0.03s ease;
+        }
+        .white-key .key-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #999;
+            letter-spacing: 0.3px;
+            pointer-events: none;
+            transition: color 0.08s;
+        }
+        .white-key.pressed .key-label {
+            color: #5a80a0;
+        }
+
+        /* 黑键层 */
+        .black-keys-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: var(--black-key-height);
+            z-index: 3;
+            pointer-events: none;
+        }
+        .black-key {
+            position: absolute;
+            height: 100%;
+            width: var(--black-key-width);
+            background: linear-gradient(180deg,
+                    #3d3d3d 0%,
+                    #2a2a2a 8%,
+                    #1f1f1f 30%,
+                    #181818 60%,
+                    #1a1a1a 85%,
+                    #222 100%);
+            border: 1.5px solid #0a0a0a;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 3;
+            box-shadow:
+                0 3px 6px rgba(0, 0, 0, 0.5),
+                0 -2px 3px rgba(0, 0, 0, 0.4) inset,
+                1px 0 2px rgba(0, 0, 0, 0.3) inset,
+                -1px 0 2px rgba(0, 0, 0, 0.3) inset;
+            transition: background 0.05s ease, box-shadow 0.05s ease, transform 0.03s ease;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 8px;
+            transform: translateX(-50%);
+        }
+        .black-key.pressed {
+            background: linear-gradient(180deg,
+                    #5a7da8 0%,
+                    #4a6d98 8%,
+                    #3d5f85 40%,
+                    #355575 70%,
+                    #3a5a78 100%);
+            box-shadow:
+                0 1px 2px rgba(0, 0, 0, 0.4),
+                0 1px 3px rgba(0, 0, 0, 0.3) inset,
+                1px 0 1px rgba(0, 0, 0, 0.2) inset;
+            border-color: #2a4a6a;
+            transform: translateX(-50%) translateY(2px);
+            transition: all 0.03s ease;
+        }
+        .black-key .key-label {
+            font-size: 8px;
+            font-weight: 600;
+            color: #888;
+            letter-spacing: 0.2px;
+            pointer-events: none;
+            transition: color 0.08s;
+        }
+        .black-key.pressed .key-label {
+            color: #c8ddf8;
+        }
+
+        /* 底部提示 */
+        .hint-bar {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            padding: 4px 16px 0;
+            font-size: 11px;
+            color: #444;
+            letter-spacing: 0.5px;
+        }
+        .hint-bar span {
+            color: #666;
+        }
+
+        /* 横屏优化 */
+        @media (orientation: landscape) {
+            :root {
+                --white-key-height: 170px;
+                --black-key-height: 105px;
+            }
+            body {
+                justify-content: center;
+                padding-bottom: 4px;
+            }
+            .piano-wrapper {
+                max-width: 680px;
+                padding: 0 16px 2px;
+            }
+            .info-bar {
+                max-width: 680px;
+                padding: 4px 16px 4px;
+            }
+            .note-display {
+                min-height: 40px;
+                padding: 8px 14px;
+            }
+            .note-display .note-name {
+                font-size: 24px;
+            }
+            .hint-bar {
+                max-width: 680px;
+                font-size: 10px;
+            }
+            .white-key .key-label {
+                font-size: 9px;
+            }
+            .black-key .key-label {
+                font-size: 7px;
+            }
+        }
+
+        @media (min-width: 500px) {
+            :root {
+                --white-key-height: 240px;
+                --black-key-height: 148px;
+            }
+            .white-key .key-label {
+                font-size: 11px;
+            }
+            .black-key .key-label {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 350px) {
+            :root {
+                --white-key-height: 175px;
+                --black-key-height: 108px;
+            }
+            .white-key .key-label {
+                font-size: 8px;
+            }
+            .black-key .key-label {
+                font-size: 7px;
+            }
+            .note-display .note-name {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部信息栏 -->
+    <div class="info-bar">
+        <div class="note-display" id="noteDisplay">
+            <span class="note-name idle" id="noteName">轻触琴键</span>
+            <span class="note-freq" id="noteFreq"></span>
+        </div>
+        <div class="volume-wrapper">
+            <span class="volume-icon">🔊</span>
+            <input type="range" class="volume-slider" id="volumeSlider" min="10" max="100" value="70" title="音量">
+        </div>
+    </div>
+
+    <!-- 钢琴主体 -->
+    <div class="piano-wrapper">
+        <div class="piano-container" id="pianoContainer">
+            <div class="keys-area" id="keysArea">
+                <!-- 白键行 -->
+                <div class="white-keys-row" id="whiteKeysRow"></div>
+                <!-- 黑键层 -->
+                <div class="black-keys-layer" id="blackKeysLayer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部提示 -->
+    <div class="hint-bar">
+        <span>💡 支持多指同时弹奏 · 滑动手指连续演奏 · 点击琴键演奏单音</span>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== DOM元素 ====================
+            const whiteKeysRow = document.getElementById('whiteKeysRow');
+            const blackKeysLayer = document.getElementById('blackKeysLayer');
+            const keysArea = document.getElementById('keysArea');
+            const pianoContainer = document.getElementById('pianoContainer');
+            const noteNameEl = document.getElementById('noteName');
+            const noteFreqEl = document.getElementById('noteFreq');
+            const noteDisplay = document.getElementById('noteDisplay');
+            const volumeSlider = document.getElementById('volumeSlider');
+
+            // ==================== 音符定义 ====================
+            // 白键：C4(中央C) 到 C6，共15个白键
+            const whiteNoteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+            const whiteKeysData = []; // { noteName, octave, midiNote, frequency, label }
+            const blackKeysData = []; // { noteName, octave, midiNote, frequency, label, positionIndex }
+
+            // 生成白键数据 (C4=midi 60 到 C6=midi 72)
+            const startMidi = 60; // C4
+            const numWhiteKeys = 15; // C4到C6
+            const whiteMidiNotes = [];
+            {
+                let midi = startMidi;
+                const whiteIntervals = [0, 2, 4, 5, 7, 9, 11]; // 白键在八度中的半音偏移
+                for (let i = 0; i < numWhiteKeys; i++) {
+                    const octaveOffset = Math.floor(i / 7);
+                    const noteIndex = i % 7;
+                    const octave = 4 + octaveOffset;
+                    const midiNote = startMidi + octaveOffset * 12 + whiteIntervals[noteIndex];
+                    whiteMidiNotes.push(midiNote);
+                    const freq = midiToFreq(midiNote);
+                    whiteKeysData.push({
+                        noteName: whiteNoteNames[noteIndex],
+                        octave: octave,
+                        midiNote: midiNote,
+                        frequency: freq,
+                        label: whiteNoteNames[noteIndex] + (octaveOffset > 0 && noteIndex === 0 ? octave : ''),
+                        fullName: whiteNoteNames[noteIndex] + octave,
+                    });
+                }
+            }
+
+            // 生成黑键数据
+            const blackKeyDefs = [
+                { name: 'C#', whiteIndex: 0 },
+                { name: 'D#', whiteIndex: 1 },
+                { name: 'F#', whiteIndex: 3 },
+                { name: 'G#', whiteIndex: 4 },
+                { name: 'A#', whiteIndex: 5 },
+            ];
+            for (let octaveOffset = 0; octaveOffset < 2; octaveOffset++) {
+                const baseWhiteIndex = octaveOffset * 7;
+                const octave = 4 + octaveOffset;
+                for (const def of blackKeyDefs) {
+                    const whiteIndex = baseWhiteIndex + def.whiteIndex;
+                    if (whiteIndex < numWhiteKeys - 1) {
+                        const midiNote = whiteKeysData[whiteIndex].midiNote + 1;
+                        const freq = midiToFreq(midiNote);
+                        blackKeysData.push({
+                            noteName: def.name,
+                            octave: octave,
+                            midiNote: midiNote,
+                            frequency: freq,
+                            label: def.name,
+                            fullName: def.name + octave,
+                            positionIndex: whiteIndex,
+                        });
+                    }
+                }
+            }
+
+            function midiToFreq(midi) {
+                return 440 * Math.pow(2, (midi - 69) / 12);
+            }
+
+            // ==================== 渲染键盘 ====================
+            function renderKeyboard() {
+                // 渲染白键
+                whiteKeysRow.innerHTML = '';
+                whiteKeysData.forEach((data, index) => {
+                    const keyEl = document.createElement('div');
+                    keyEl.className = 'white-key';
+                    keyEl.dataset.index = index;
+                    keyEl.dataset.type = 'white';
+                    keyEl.dataset.midi = data.midiNote;
+                    keyEl.dataset.frequency = data.frequency.toFixed(2);
+                    keyEl.dataset.fullName = data.fullName;
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'key-label';
+                    labelSpan.textContent = data.label;
+                    keyEl.appendChild(labelSpan);
+                    whiteKeysRow.appendChild(keyEl);
+                });
+
+                // 渲染黑键
+                blackKeysLayer.innerHTML = '';
+                const totalWhite = numWhiteKeys;
+                const whiteKeyPercent = 100 / totalWhite;
+
+                blackKeysData.forEach((data) => {
+                    const keyEl = document.createElement('div');
+                    keyEl.className = 'black-key';
+                    keyEl.dataset.type = 'black';
+                    keyEl.dataset.midi = data.midiNote;
+                    keyEl.dataset.frequency = data.frequency.toFixed(2);
+                    keyEl.dataset.fullName = data.fullName;
+                    keyEl.dataset.positionIndex = data.positionIndex;
+                    // 黑键中心位于两个白键之间的缝隙
+                    const centerPercent = (data.positionIndex + 1) * whiteKeyPercent;
+                    keyEl.style.left = centerPercent + '%';
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'key-label';
+                    labelSpan.textContent = data.label;
+                    keyEl.appendChild(labelSpan);
+                    blackKeysLayer.appendChild(keyEl);
+                });
+            }
+
+            renderKeyboard();
+
+            // ==================== Web Audio API 音效引擎 ====================
+            let audioCtx = null;
+            let masterGain = null;
+            let isAudioInitialized = false;
+
+            function initAudio() {
+                if (isAudioInitialized && audioCtx && audioCtx.state !== 'closed') {
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume();
+                    }
+                    return;
+                }
+                try {
+                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                    masterGain = audioCtx.createGain();
+                    masterGain.gain.value = parseFloat(volumeSlider.value) / 100;
+                    masterGain.connect(audioCtx.destination);
+                    isAudioInitialized = true;
+                } catch (e) {
+                    console.warn('Web Audio API 不可用:', e);
+                }
+            }
+
+            function getMasterVolume() {
+                return parseFloat(volumeSlider.value) / 100;
+            }
+
+            volumeSlider.addEventListener('input', () => {
+                const vol = getMasterVolume();
+                if (masterGain) {
+                    masterGain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                }
+            });
+
+            // 活跃的音符追踪：touchId -> { oscNodes, gainNode, keyElement, midiNote }
+            const activeNotes = new Map();
+
+            function createPianoTone(frequency, midiNote, startTime) {
+                if (!audioCtx || !masterGain) return null;
+
+                const now = startTime || audioCtx.currentTime;
+                const vol = getMasterVolume();
+
+                // 主增益节点 - 控制整个音符的包络
+                const noteGain = audioCtx.createGain();
+                noteGain.gain.setValueAtTime(0, now);
+                // 快速起音
+                noteGain.gain.linearRampToValueAtTime(vol * 0.85, now + 0.004);
+                // 初始冲击后的微小回落
+                noteGain.gain.linearRampToValueAtTime(vol * 0.7, now + 0.015);
+                // 指数衰减 - 模拟钢琴声音的自然衰减
+                const decayTime = midiNote < 55 ? 2.5 : midiNote < 65 ? 1.8 : midiNote < 72 ? 1.2 : 0.7;
+                noteGain.gain.setTargetAtTime(vol * 0.001, now + 0.02, decayTime);
+
+                noteGain.connect(masterGain);
+
+                // 基频振荡器 - 三角波，温暖的基音
+                const osc1 = audioCtx.createOscillator();
+                osc1.type = 'triangle';
+                osc1.frequency.setValueAtTime(frequency, now);
+                osc1.connect(noteGain);
+                osc1.start(now);
+
+                // 二次谐波 - 增加亮度（较弱）
+                const osc2 = audioCtx.createOscillator();
+                osc2.type = 'triangle';
+                osc2.frequency.setValueAtTime(frequency * 2, now);
+                const harmonicGain2 = audioCtx.createGain();
+                harmonicGain2.gain.setValueAtTime(vol * 0.25, now);
+                harmonicGain2.gain.setTargetAtTime(0.001, now + 0.01, decayTime * 0.5);
+                osc2.connect(harmonicGain2);
+                harmonicGain2.connect(noteGain);
+                osc2.start(now);
+
+                // 三次谐波 - 非常微弱，快速衰减
+                const osc3 = audioCtx.createOscillator();
+                osc3.type = 'sine';
+                osc3.frequency.setValueAtTime(frequency * 3.003, now); // 轻微失谐
+                const harmonicGain3 = audioCtx.createGain();
+                harmonicGain3.gain.setValueAtTime(vol * 0.08, now);
+                harmonicGain3.gain.setTargetAtTime(0.001, now + 0.005, decayTime * 0.25);
+                osc3.connect(harmonicGain3);
+                harmonicGain3.connect(noteGain);
+                osc3.start(now);
+
+                // 短暂的噪声爆发 - 模拟琴槌敲击
+                const noiseBuffer = createNoiseBuffer(0.015);
+                if (noiseBuffer) {
+                    const noiseSource = audioCtx.createBufferSource();
+                    noiseSource.buffer = noiseBuffer;
+                    const noiseGain = audioCtx.createGain();
+                    noiseGain.gain.setValueAtTime(vol * 0.35, now);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+                    noiseSource.connect(noiseGain);
+                    noiseGain.connect(noteGain);
+                    noiseSource.start(now);
+                    noiseSource.stop(now + 0.02);
+                }
+
+                return {
+                    gainNode: noteGain,
+                    oscNodes: [osc1, osc2, osc3],
+                    midiNote: midiNote,
+                    frequency: frequency,
+                };
+            }
+
+            function createNoiseBuffer(duration) {
+                if (!audioCtx) return null;
+                const sampleRate = audioCtx.sampleRate;
+                const length = Math.floor(sampleRate * duration);
+                const buffer = audioCtx.createBuffer(1, length, sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < length; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+                }
+                return buffer;
+            }
+
+            function releaseNote(noteData, fastRelease = false) {
+                if (!noteData || !audioCtx) return;
+                const now = audioCtx.currentTime;
+                const releaseTime = fastRelease ? 0.05 : 0.12;
+                try {
+                    noteData.gainNode.gain.cancelScheduledValues(now);
+                    noteData.gainNode.gain.setValueAtTime(noteData.gainNode.gain.value || 0.01, now);
+                    noteData.gainNode.gain.linearRampToValueAtTime(0.0001, now + releaseTime);
+                } catch (e) {
+                    // 忽略已释放节点上的错误
+                }
+                // 延迟停止振荡器以避免咔嗒声
+                const stopTime = now + releaseTime + 0.05;
+                noteData.oscNodes.forEach(osc => {
+                    try {
+                        osc.stop(stopTime);
+                    } catch (e) {
+                        // 可能已经停止
+                    }
+                });
+                // 清理
+                setTimeout(() => {
+                    try {
+                        noteData.gainNode.disconnect();
+                        noteData.oscNodes.forEach(osc => {
+                            try { osc.disconnect(); } catch (e) {}
+                        });
+                    } catch (e) {}
+                }, Math.floor((releaseTime + 0.1) * 1000));
+            }
+
+            // ==================== 按键视觉反馈 ====================
+            function getKeyElementByPoint(x, y) {
+                // 先检查黑键（因为它们在z轴上层）
+                const blackKeys = blackKeysLayer.querySelectorAll('.black-key');
+                for (const bk of blackKeys) {
+                    const rect = bk.getBoundingClientRect();
+                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                        return bk;
+                    }
+                }
+                // 再检查白键
+                const whiteKeys = whiteKeysRow.querySelectorAll('.white-key');
+                for (const wk of whiteKeys) {
+                    const rect = wk.getBoundingClientRect();
+                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                        return wk;
+                    }
+                }
+                return null;
+            }
+
+            function pressKeyElement(el) {
+                if (!el || el.classList.contains('pressed')) return;
+                el.classList.add('pressed');
+            }
+
+            function releaseKeyElement(el) {
+                if (!el) return;
+                el.classList.remove('pressed');
+            }
+
+            function updateNoteDisplay(keyEl) {
+                if (keyEl && keyEl.dataset.fullName) {
+                    noteNameEl.textContent = keyEl.dataset.fullName;
+                    noteNameEl.classList.remove('idle');
+                    noteFreqEl.textContent = keyEl.dataset.frequency ? '≈' + keyEl.dataset.frequency + 'Hz' : '';
+                    noteDisplay.style.borderColor = '#c9a96e';
+                } else {
+                    noteNameEl.textContent = '轻触琴键';
+                    noteNameEl.classList.add('idle');
+                    noteFreqEl.textContent = '';
+                    noteDisplay.style.borderColor = '#2a2a35';
+                }
+            }
+
+            // ==================== 触摸事件处理 ====================
+            function handleTouchStart(e) {
+                e.preventDefault();
+                initAudio();
+
+                const touches = e.changedTouches;
+                for (let i = 0; i < touches.length; i++) {
+                    const touch = touches[i];
+                    const keyEl = getKeyElementByPoint(touch.clientX, touch.clientY);
+                    if (keyEl) {
+                        const touchId = touch.identifier;
+                        // 如果该手指已经有活跃音符，先释放
+                        if (activeNotes.has(touchId)) {
+                            const oldData = activeNotes.get(touchId);
+                            releaseNote(oldData.noteData, true);
+                            releaseKeyElement(oldData.keyElement);
+                            activeNotes.delete(touchId);
+                        }
+                        // 开始新音符
+                        const midi = parseInt(keyEl.dataset.midi);
+                        const freq = parseFloat(keyEl.dataset.frequency);
+                        const noteData = createPianoTone(freq, midi);
+                        if (noteData) {
+                            pressKeyElement(keyEl);
+                            activeNotes.set(touchId, {
+                                noteData: noteData,
+                                keyElement: keyEl,
+                                midiNote: midi,
+                            });
+                            updateNoteDisplay(keyEl);
+                        }
+                    }
+                }
+                // 更新显示（显示最后按下的音符）
+                updateActiveDisplay();
+            }
+
+            function handleTouchMove(e) {
+                e.preventDefault();
+                const touches = e.changedTouches;
+                for (let i = 0; i < touches.length; i++) {
+                    const touch = touches[i];
+                    const touchId = touch.identifier;
+                    const currentActive = activeNotes.get(touchId);
+                    const keyEl = getKeyElementByPoint(touch.clientX, touch.clientY);
+
+                    if (keyEl) {
+                        if (currentActive && keyEl === currentActive.keyElement) {
+                            // 手指在同一键上滑动，不做改变
+                            continue;
+                        }
+                        if (currentActive && keyEl !== currentActive.keyElement) {
+                            // 手指滑到了不同的键
+                            releaseNote(currentActive.noteData, true);
+                            releaseKeyElement(currentActive.keyElement);
+                            activeNotes.delete(touchId);
+                        }
+                        // 在新键上开始音符
+                        const midi = parseInt(keyEl.dataset.midi);
+                        const freq = parseFloat(keyEl.dataset.frequency);
+                        const noteData = createPianoTone(freq, midi);
+                        if (noteData) {
+                            pressKeyElement(keyEl);
+                            activeNotes.set(touchId, {
+                                noteData: noteData,
+                                keyElement: keyEl,
+                                midiNote: midi,
+                            });
+                            updateNoteDisplay(keyEl);
+                        }
+                    } else {
+                        // 手指滑出钢琴区域
+                        if (currentActive) {
+                            releaseNote(currentActive.noteData, true);
+                            releaseKeyElement(c
