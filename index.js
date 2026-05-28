@@ -1,52 +1,43 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const PORT = 3000;
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(`
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Hello World</title>
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-          display: flex; 
-          justify-content: center; 
-          align-items: center; 
-          height: 100vh; 
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-        }
-        .container { 
-          text-align: center; 
-          padding: 40px; 
-          background: white; 
-          border-radius: 20px; 
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2); 
-          max-width: 90%; 
-        }
-        h1 { 
-          font-size: 3rem; 
-          color: #333; 
-          margin-bottom: 10px; 
-        }
-        p { 
-          font-size: 1.2rem; 
-          color: #666; 
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>🎉 Hello, World!</h1>
-        <p>欢迎访问我的Node.js服务器</p>
-      </div>
-    </body>
-    </html>
-  `);
+  let filePath = '.' + req.url;
+  if (filePath === './') {
+    filePath = './Index.html';
+  }
+
+  const extname = String(path.extname(filePath)).toLowerCase();
+  const contentType = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.css': 'text/css',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon'
+  }[extname] || 'application/octet-stream';
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      if(error.code === 'ENOENT') {
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        res.end('<h1>404 - 文件未找到</h1>', 'utf-8');
+      }
+      else {
+        res.writeHead(500);
+        res.end('服务器错误: ' + error.code);
+      }
+    }
+    else {
+      res.writeHead(200, { 'Content-Type': contentType + '; charset=utf-8' });
+      res.end(content, 'utf-8');
+    }
+  });
 });
 
 server.listen(PORT, '0.0.0.0', () => {
